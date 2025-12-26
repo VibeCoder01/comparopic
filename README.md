@@ -1,0 +1,2 @@
+# comparopic
+Compares two photos
