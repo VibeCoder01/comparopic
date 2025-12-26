@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photo Comparator</title>
+  <style>
+    :root {
+      --bg-1: #f7f1e7;
+      --bg-2: #efe0c7;
+      --ink: #1b1a17;
+      --muted: #5a564b;
+      --accent: #c65c3b;
+      --accent-2: #2a7f62;
+      --panel: #fff8ee;
+      --shadow: 0 16px 40px rgba(27, 26, 23, 0.16);
+      --radius: 18px;
+      --divider: #1b1a17;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Space Grotesk", "Futura", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(1200px 700px at 15% 15%, #fff7e6, transparent),
+        radial-gradient(900px 600px at 85% 20%, #ffe6d5, transparent),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+      display: grid;
+      gap: 28px;
+    }
+
+    header {
+      display: grid;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin: 0;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 720px;
+      font-size: 1.05rem;
+    }
+
+    .controls {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .control-row {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    input[type="file"] {
+      background: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #e6d9c2;
+    }
+
+    .views {
+      display: grid;
+      gap: 24px;
+    }
+
+    .view-card {
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 16px;
+      animation: rise 0.7s ease forwards;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    .view-card:nth-of-type(2) {
+      animation-delay: 0.08s;
+    }
+
+    .view-card:nth-of-type(3) {
+      animation-delay: 0.16s;
+    }
+
+    @keyframes rise {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .view-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .view-title {
+      font-size: 1.2rem;
+      margin: 0;
+    }
+
+    .button {
+      border: none;
+      background: var(--accent);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .button:active {
+      transform: scale(0.98);
+    }
+
+    .viewer {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #f1e7d7;
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #e4d5bf;
+    }
+
+    .viewer img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .instant-display {
+      aspect-ratio: 16 / 10;
+    }
+
+    .fade-display,
+    .wipe-display {
+      aspect-ratio: 16 / 10;
+    }
+
+    .fade-layer,
+    .wipe-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    .fade-layer img,
+    .wipe-layer img {
+      position: absolute;
+      inset: 0;
+    }
+
+    .fade-layer img.photo-b {
+      opacity: 0.5;
+      transition: opacity 0.1s linear;
+    }
+
+    .wipe-layer {
+      width: 100%;
+      height: 100%;
+      clip-path: inset(0 50% 0 0);
+    }
+
+    .divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--divider);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+      transform: translateX(-1px);
+      pointer-events: none;
+    }
+
+    .slider-row {
+      display: grid;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-2);
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    @media (max-width: 720px) {
+      .view-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Photo Comparator</h1>
+      <p class="lead">Upload two photos and compare them instantly, fade between them, or drag a divider to reveal differences.</p>
+    </header>
+
+    <section class="controls">
+      <div class="control-row">
+        <label for="photoA">Photo A</label>
+        <input id="photoA" type="file" accept="image/*" />
+      </div>
+      <div class="control-row">
+        <label for="photoB">Photo B</label>
+        <input id="photoB" type="file" accept="image/*" />
+      </div>
+    </section>
+
+    <section class="views">
+      <article class="view-card">
+        <div class="view-head">
+          <h2 class="view-title">Instant Flip</h2>
+          <button class="button" id="flipButton">Show Photo B</button>
+        </div>
+        <div class="viewer instant-display">
+          <img class="instant-img" alt="Instant comparison" />
+        </div>
+        <p class="hint">Tap the button to switch between the two photos instantly.</p>
+      </article>
+
+      <article class="view-card">
+        <div class="view-head">
+          <h2 class="view-title">Fade Slider</h2>
+        </div>
+        <div class="viewer fade-display">
+          <img class="photo-a" alt="Photo A" />
+          <div class="fade-layer">
+            <img class="photo-b" alt="Photo B" />
+          </div>
+        </div>
+        <div class="slider-row">
+          <label for="fadeSlider">Blend Amount</label>
+          <input id="fadeSlider" type="range" min="0" max="100" value="50" />
+        </div>
+      </article>
+
+      <article class="view-card">
+        <div class="view-head">
+          <h2 class="view-title">Divider Reveal</h2>
+        </div>
+        <div class="viewer wipe-display" id="wipeViewer">
+          <img class="photo-a" alt="Photo A" />
+          <div class="wipe-layer" id="wipeLayer">
+            <img class="photo-b" alt="Photo B" />
+          </div>
+          <div class="divider" id="divider"></div>
+        </div>
+        <div class="slider-row">
+          <label for="wipeSlider">Reveal Position</label>
+          <input id="wipeSlider" type="range" min="0" max="100" value="50" />
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    const defaultA =
+      "data:image/svg+xml;utf8," +
+      encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'>
+          <defs>
+            <linearGradient id='g' x1='0' x2='1' y1='0' y2='1'>
+              <stop offset='0' stop-color='#f6c37a'/>
+              <stop offset='1' stop-color='#f08f6e'/>
+            </linearGradient>
+          </defs>
+          <rect width='800' height='500' fill='url(#g)'/>
+          <circle cx='190' cy='170' r='110' fill='#fff4d6' opacity='0.85'/>
+          <rect x='320' y='250' width='360' height='180' rx='28' fill='#db6a4b'/>
+          <text x='70' y='450' font-family='Trebuchet MS' font-size='36' fill='#4c2d1f'>Sample A</text>
+        </svg>`
+      );
+
+    const defaultB =
+      "data:image/svg+xml;utf8," +
+      encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'>
+          <defs>
+            <linearGradient id='g' x1='1' x2='0' y1='0' y2='1'>
+              <stop offset='0' stop-color='#7bc9b0'/>
+              <stop offset='1' stop-color='#2f7f6a'/>
+            </linearGradient>
+          </defs>
+          <rect width='800' height='500' fill='url(#g)'/>
+          <rect x='90' y='90' width='220' height='220' rx='40' fill='#114c3f' opacity='0.6'/>
+          <rect x='360' y='140' width='360' height='260' rx='40' fill='#f2efe6' opacity='0.8'/>
+          <text x='520' y='460' font-family='Trebuchet MS' font-size='36' fill='#0f2b24'>Sample B</text>
+        </svg>`
+      );
+
+    const photoInputs = {
+      a: document.getElementById("photoA"),
+      b: document.getElementById("photoB"),
+    };
+
+    const instantImg = document.querySelector(".instant-img");
+    const photoAImgs = document.querySelectorAll(".photo-a");
+    const photoBImgs = document.querySelectorAll(".photo-b");
+
+    let currentA = defaultA;
+    let currentB = defaultB;
+    let showingA = true;
+
+    const updateAllImages = () => {
+      photoAImgs.forEach((img) => (img.src = currentA));
+      photoBImgs.forEach((img) => (img.src = currentB));
+      instantImg.src = showingA ? currentA : currentB;
+    };
+
+    const loadImage = (file, target) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (target === "a") currentA = reader.result;
+        if (target === "b") currentB = reader.result;
+        updateAllImages();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    photoInputs.a.addEventListener("change", (event) => loadImage(event.target.files[0], "a"));
+    photoInputs.b.addEventListener("change", (event) => loadImage(event.target.files[0], "b"));
+
+    const flipButton = document.getElementById("flipButton");
+    const instantViewer = document.querySelector(".instant-display");
+    const toggleInstant = () => {
+      showingA = !showingA;
+      instantImg.src = showingA ? currentA : currentB;
+      flipButton.textContent = showingA ? "Show Photo B" : "Show Photo A";
+    };
+    flipButton.addEventListener("click", toggleInstant);
+    instantViewer.addEventListener("click", toggleInstant);
+
+    const fadeSlider = document.getElementById("fadeSlider");
+    const fadeLayerImg = document.querySelector(".fade-layer .photo-b");
+    const updateFade = (value) => {
+      fadeLayerImg.style.opacity = (value / 100).toFixed(2);
+    };
+    fadeSlider.addEventListener("input", (event) => updateFade(event.target.value));
+
+    const wipeSlider = document.getElementById("wipeSlider");
+    const wipeLayer = document.getElementById("wipeLayer");
+    const divider = document.getElementById("divider");
+    const wipeViewer = document.getElementById("wipeViewer");
+    const updateWipe = (value) => {
+      const percent = Number(value);
+      const clipRight = 100 - percent;
+      wipeLayer.style.clipPath = `inset(0 ${clipRight}% 0 0)`;
+      divider.style.left = `${percent}%`;
+      wipeSlider.value = percent;
+    };
+    wipeSlider.addEventListener("input", (event) => updateWipe(event.target.value));
+    const updateFromPointer = (event) => {
+      const bounds = wipeViewer.getBoundingClientRect();
+      const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+      const raw = ((clientX - bounds.left) / bounds.width) * 100;
+      const percent = Math.min(100, Math.max(0, raw));
+      updateWipe(percent);
+    };
+    let dragging = false;
+    const startDrag = (event) => {
+      dragging = true;
+      updateFromPointer(event);
+    };
+    const moveDrag = (event) => {
+      if (!dragging) return;
+      updateFromPointer(event);
+    };
+    const stopDrag = () => {
+      dragging = false;
+    };
+    wipeViewer.addEventListener("mousedown", startDrag);
+    wipeViewer.addEventListener("touchstart", startDrag, { passive: true });
+    window.addEventListener("mousemove", moveDrag);
+    window.addEventListener("touchmove", moveDrag, { passive: true });
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("touchend", stopDrag);
+    window.addEventListener("touchcancel", stopDrag);
+
+    updateAllImages();
+    updateFade(fadeSlider.value);
+    updateWipe(wipeSlider.value);
+  </script>
+</body>
+</html>
