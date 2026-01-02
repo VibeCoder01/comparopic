@@ -7,6 +7,7 @@ A single-page app to compare two photos using instant flip, fade blending, a dra
 - Fade slider to blend between images
 - Divider reveal with drag-to-move and slider control
 - Stereoscopic left/right view with a toggle for parallel vs cross-eye viewing
+- Images are always shown fully (no cropping) across all comparison modes and orientations
 - Local file uploads, no server required
 
 ## Comparison modes
