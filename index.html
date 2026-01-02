@@ -16,6 +16,18 @@
       --shadow: 0 16px 40px rgba(27, 26, 23, 0.16);
       --radius: 18px;
       --divider: #1b1a17;
+      --offset-x: 0px;
+      --offset-y: 0px;
+      --pad-x: 0px;
+      --pad-y: 0px;
+      --pad-a-left: 0px;
+      --pad-a-right: 0px;
+      --pad-a-top: 0px;
+      --pad-a-bottom: 0px;
+      --pad-b-left: 0px;
+      --pad-b-right: 0px;
+      --pad-b-top: 0px;
+      --pad-b-bottom: 0px;
     }
 
     * {
@@ -70,6 +82,41 @@
     .control-row {
       display: grid;
       gap: 12px;
+    }
+
+    .offset-grid {
+      display: grid;
+      gap: 12px;
+      background: #f6ecdd;
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid #ead9c3;
+    }
+
+    .offset-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .offset-readout {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .offset-readout strong {
+      font-variant-numeric: tabular-nums;
+      min-width: 54px;
+      display: inline-block;
+      text-align: right;
+      font-weight: 600;
+      color: var(--ink);
     }
 
     label {
@@ -163,6 +210,12 @@
       height: 100%;
       object-fit: contain;
       display: block;
+      object-position: center;
+    }
+
+    .photo-a,
+    .offset-photo-a {
+      padding: var(--pad-a-top) var(--pad-a-right) var(--pad-a-bottom) var(--pad-a-left);
     }
 
     .fade-layer,
@@ -180,6 +233,11 @@
     .fade-layer img.photo-b {
       opacity: 0.5;
       transition: opacity 0.1s linear;
+    }
+
+    .photo-b,
+    .offset-photo-b {
+      padding: var(--pad-b-top) var(--pad-b-right) var(--pad-b-bottom) var(--pad-b-left);
     }
 
     .wipe-layer {
@@ -258,6 +316,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      object-position: top center;
       display: block;
     }
 
@@ -301,6 +360,19 @@
       <div class="control-row">
         <label for="photoB">Photo B</label>
         <input id="photoB" type="file" accept="image/*" />
+      </div>
+      <div class="control-row">
+        <label>Photo B Alignment</label>
+        <div class="offset-grid">
+          <div class="offset-meta">
+            <span>Use arrow keys to nudge (shift = faster)</span>
+            <button class="button" type="button" id="offsetReset">Reset</button>
+          </div>
+          <div class="offset-readout">
+            <span>X <strong id="offsetXValue">0px</strong></span>
+            <span>Y <strong id="offsetYValue">0px</strong></span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -411,6 +483,9 @@
       a: document.getElementById("photoA"),
       b: document.getElementById("photoB"),
     };
+    const offsetXValue = document.getElementById("offsetXValue");
+    const offsetYValue = document.getElementById("offsetYValue");
+    const offsetReset = document.getElementById("offsetReset");
 
     const instantImg = document.querySelector(".instant-img");
     const photoAImgs = document.querySelectorAll(".photo-a");
@@ -421,6 +496,7 @@
     const instantViewer = document.querySelector(".instant-display");
     const fadeViewer = document.querySelector(".fade-display");
     const wipeViewer = document.getElementById("wipeViewer");
+    const stereoViewer = document.getElementById("stereoViewer");
     const fadeA = fadeViewer.querySelector(".photo-a");
     const fadeB = fadeViewer.querySelector(".photo-b");
     const wipeA = wipeViewer.querySelector(".photo-a");
@@ -430,6 +506,11 @@
     let currentA = defaultA;
     let currentB = defaultB;
     let showingA = true;
+    let offsetX = 0;
+    let offsetY = 0;
+    const OFFSET_LIMIT = 120;
+    const OFFSET_STEP = 1;
+    const OFFSET_FAST_STEP = 5;
 
     const ratioFrom = (...images) => {
       const ratios = images
@@ -447,26 +528,99 @@
       return Math.max(...ratios);
     };
 
-    const setViewerHeight = (viewer, ratio) => {
+    const setViewerHeight = (viewer, ratio, padX, padY) => {
       if (!viewer || !ratio) return;
       const width = viewer.clientWidth;
       if (!width) return;
-      viewer.style.height = `${Math.round(width / ratio)}px`;
+      const height = Math.max(1, Math.round(width / ratio + padY * 2));
+      viewer.style.height = `${height}px`;
+    };
+
+    const getStereoScale = () => {
+      const refWidth =
+        instantViewer.clientWidth ||
+        fadeViewer.clientWidth ||
+        wipeViewer.clientWidth ||
+        stereoPanes[0]?.clientWidth ||
+        0;
+      const stereoWidth = stereoPanes[0]?.clientWidth || 0;
+      if (!refWidth || !stereoWidth) return 1;
+      return stereoWidth / refWidth;
     };
 
     const resizeViewers = () => {
+      const padY = Math.abs(offsetY) / 2;
+      const stereoPadY = (Math.abs(offsetY) * getStereoScale()) / 2;
       const instantRatio = ratioFrom(photoAImgs[0], photoBImgs[0], instantImg);
-      setViewerHeight(instantViewer, instantRatio);
-      setViewerHeight(fadeViewer, ratioFrom(fadeA, fadeB));
-      setViewerHeight(wipeViewer, ratioFrom(wipeA, wipeB));
+      setViewerHeight(instantViewer, instantRatio, 0, padY);
+      setViewerHeight(fadeViewer, ratioFrom(fadeA, fadeB), 0, padY);
+      setViewerHeight(wipeViewer, ratioFrom(wipeA, wipeB), 0, padY);
       const stereoRatio = ratioMaxFrom(stereoLeft, stereoRight);
-      stereoPanes.forEach((pane) => setViewerHeight(pane, stereoRatio));
+      stereoPanes.forEach((pane) => setViewerHeight(pane, stereoRatio, 0, stereoPadY));
+    };
+
+    const applyOffsets = () => {
+      const padLeftB = offsetX > 0 ? offsetX : 0;
+      const padRightB = offsetX < 0 ? Math.abs(offsetX) : 0;
+      const padTopB = offsetY > 0 ? offsetY : 0;
+      const padBottomB = offsetY < 0 ? Math.abs(offsetY) : 0;
+      const padLeftA = padRightB;
+      const padRightA = padLeftB;
+      const padTopA = padBottomB;
+      const padBottomA = padTopB;
+      const totalPadX = Math.max(padLeftA + padRightA, padLeftB + padRightB);
+      const totalPadY = Math.max(padTopA + padBottomA, padTopB + padBottomB);
+      const padX = totalPadX / 2;
+      const padY = totalPadY / 2;
+      const stereoScale = getStereoScale();
+      const stereoOffsetX = offsetX * stereoScale;
+      const stereoOffsetY = offsetY * stereoScale;
+      const stereoPadLeftB = stereoOffsetX > 0 ? stereoOffsetX : 0;
+      const stereoPadRightB = stereoOffsetX < 0 ? Math.abs(stereoOffsetX) : 0;
+      const stereoPadTopB = stereoOffsetY > 0 ? stereoOffsetY : 0;
+      const stereoPadBottomB = stereoOffsetY < 0 ? Math.abs(stereoOffsetY) : 0;
+      const stereoPadLeftA = stereoPadRightB;
+      const stereoPadRightA = stereoPadLeftB;
+      const stereoPadTopA = stereoPadBottomB;
+      const stereoPadBottomA = stereoPadTopB;
+      document.documentElement.style.setProperty("--offset-x", `${offsetX}px`);
+      document.documentElement.style.setProperty("--offset-y", `${offsetY}px`);
+      document.documentElement.style.setProperty("--pad-x", `${padX}px`);
+      document.documentElement.style.setProperty("--pad-y", `${padY}px`);
+      document.documentElement.style.setProperty("--pad-a-left", `${padLeftA}px`);
+      document.documentElement.style.setProperty("--pad-a-right", `${padRightA}px`);
+      document.documentElement.style.setProperty("--pad-a-top", `${padTopA}px`);
+      document.documentElement.style.setProperty("--pad-a-bottom", `${padBottomA}px`);
+      document.documentElement.style.setProperty("--pad-b-left", `${padLeftB}px`);
+      document.documentElement.style.setProperty("--pad-b-right", `${padRightB}px`);
+      document.documentElement.style.setProperty("--pad-b-top", `${padTopB}px`);
+      document.documentElement.style.setProperty("--pad-b-bottom", `${padBottomB}px`);
+      stereoViewer.style.setProperty("--pad-a-left", `${stereoPadLeftA}px`);
+      stereoViewer.style.setProperty("--pad-a-right", `${stereoPadRightA}px`);
+      stereoViewer.style.setProperty("--pad-a-top", `${stereoPadTopA}px`);
+      stereoViewer.style.setProperty("--pad-a-bottom", `${stereoPadBottomA}px`);
+      stereoViewer.style.setProperty("--pad-b-left", `${stereoPadLeftB}px`);
+      stereoViewer.style.setProperty("--pad-b-right", `${stereoPadRightB}px`);
+      stereoViewer.style.setProperty("--pad-b-top", `${stereoPadTopB}px`);
+      stereoViewer.style.setProperty("--pad-b-bottom", `${stereoPadBottomB}px`);
+      offsetXValue.textContent = `${offsetX}px`;
+      offsetYValue.textContent = `${offsetY}px`;
+      resizeViewers();
+    };
+
+    const updateInstantOffset = () => {
+      instantImg.classList.toggle("offset-photo-b", !showingA);
+      instantImg.classList.toggle("offset-photo-a", showingA);
     };
 
     const updateStereo = () => {
       const seeThrough = stereoToggle.checked;
       stereoLeft.src = seeThrough ? currentA : currentB;
       stereoRight.src = seeThrough ? currentB : currentA;
+      stereoLeft.classList.toggle("offset-photo-b", !seeThrough);
+      stereoLeft.classList.toggle("offset-photo-a", seeThrough);
+      stereoRight.classList.toggle("offset-photo-b", seeThrough);
+      stereoRight.classList.toggle("offset-photo-a", !seeThrough);
       resizeViewers();
     };
 
@@ -474,6 +628,7 @@
       photoAImgs.forEach((img) => (img.src = currentA));
       photoBImgs.forEach((img) => (img.src = currentB));
       instantImg.src = showingA ? currentA : currentB;
+      updateInstantOffset();
       updateStereo();
       resizeViewers();
     };
@@ -492,11 +647,42 @@
     photoInputs.a.addEventListener("change", (event) => loadImage(event.target.files[0], "a"));
     photoInputs.b.addEventListener("change", (event) => loadImage(event.target.files[0], "b"));
     stereoToggle.addEventListener("change", updateStereo);
+    offsetReset.addEventListener("click", () => {
+      offsetX = 0;
+      offsetY = 0;
+      applyOffsets();
+    });
+    window.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      const step = event.shiftKey ? OFFSET_FAST_STEP : OFFSET_STEP;
+      let handled = true;
+      switch (event.key) {
+        case "ArrowLeft":
+          offsetX = Math.max(-OFFSET_LIMIT, offsetX - step);
+          break;
+        case "ArrowRight":
+          offsetX = Math.min(OFFSET_LIMIT, offsetX + step);
+          break;
+        case "ArrowUp":
+          offsetY = Math.max(-OFFSET_LIMIT, offsetY - step);
+          break;
+        case "ArrowDown":
+          offsetY = Math.min(OFFSET_LIMIT, offsetY + step);
+          break;
+        default:
+          handled = false;
+      }
+      if (!handled) return;
+      event.preventDefault();
+      applyOffsets();
+    });
 
     const flipButton = document.getElementById("flipButton");
     const toggleInstant = () => {
       showingA = !showingA;
       instantImg.src = showingA ? currentA : currentB;
+      updateInstantOffset();
       flipButton.textContent = showingA ? "Show Photo B" : "Show Photo A";
       resizeViewers();
     };
@@ -585,6 +771,7 @@
     updateAllImages();
     updateFade(fadeSlider.value);
     updateWipe(wipeSlider.value);
+    applyOffsets();
   </script>
 </body>
 </html>
