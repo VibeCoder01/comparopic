@@ -161,17 +161,8 @@
     .viewer img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
-    }
-
-    .instant-display {
-      aspect-ratio: 16 / 10;
-    }
-
-    .fade-display,
-    .wipe-display {
-      aspect-ratio: 16 / 10;
     }
 
     .fade-layer,
@@ -213,6 +204,27 @@
       gap: 10px;
     }
 
+    .toggle-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #f6ecdd;
+      border-radius: 999px;
+      padding: 6px 12px;
+      border: 1px solid #ead9c3;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .toggle-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-2);
+    }
+
     input[type="range"] {
       width: 100%;
       accent-color: var(--accent-2);
@@ -224,10 +236,49 @@
       margin: 0;
     }
 
+    .stereo-display {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .stereo-pane {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f1e7d7;
+      border: 1px solid #e4d5bf;
+    }
+
+    .stereo-pane img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .stereo-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(27, 26, 23, 0.75);
+      color: #fff;
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
     @media (max-width: 720px) {
       .view-head {
         flex-direction: column;
         align-items: flex-start;
+      }
+
+      .stereo-display {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -294,6 +345,27 @@
           <input id="wipeSlider" type="range" min="0" max="100" value="50" />
         </div>
       </article>
+
+      <article class="view-card">
+        <div class="view-head">
+          <h2 class="view-title">Stereoscopic Pair</h2>
+          <label class="toggle-row" for="stereoToggle">
+            <input id="stereoToggle" type="checkbox" checked />
+            See-through (parallel) view
+          </label>
+        </div>
+        <div class="viewer stereo-display" id="stereoViewer">
+          <div class="stereo-pane">
+            <span class="stereo-label">Left</span>
+            <img class="stereo-left" alt="Stereo left view" />
+          </div>
+          <div class="stereo-pane">
+            <span class="stereo-label">Right</span>
+            <img class="stereo-right" alt="Stereo right view" />
+          </div>
+        </div>
+        <p class="hint">Toggle to swap left/right for eye-cross-over viewing.</p>
+      </article>
     </section>
   </div>
 
@@ -340,15 +412,57 @@
     const instantImg = document.querySelector(".instant-img");
     const photoAImgs = document.querySelectorAll(".photo-a");
     const photoBImgs = document.querySelectorAll(".photo-b");
+    const stereoLeft = document.querySelector(".stereo-left");
+    const stereoRight = document.querySelector(".stereo-right");
+    const stereoToggle = document.getElementById("stereoToggle");
+    const instantViewer = document.querySelector(".instant-display");
+    const fadeViewer = document.querySelector(".fade-display");
+    const wipeViewer = document.getElementById("wipeViewer");
+    const fadeA = fadeViewer.querySelector(".photo-a");
+    const fadeB = fadeViewer.querySelector(".photo-b");
+    const wipeA = wipeViewer.querySelector(".photo-a");
+    const wipeB = wipeViewer.querySelector(".photo-b");
+    const stereoPanes = document.querySelectorAll(".stereo-pane");
 
     let currentA = defaultA;
     let currentB = defaultB;
     let showingA = true;
 
+    const updateStereo = () => {
+      const seeThrough = stereoToggle.checked;
+      stereoLeft.src = seeThrough ? currentA : currentB;
+      stereoRight.src = seeThrough ? currentB : currentA;
+    };
+
+    const ratioFrom = (...images) => {
+      const ratios = images
+        .filter((img) => img && img.naturalWidth && img.naturalHeight)
+        .map((img) => img.naturalWidth / img.naturalHeight);
+      if (!ratios.length) return null;
+      return Math.min(...ratios);
+    };
+
+    const setViewerHeight = (viewer, ratio) => {
+      if (!viewer || !ratio) return;
+      const width = viewer.clientWidth;
+      if (!width) return;
+      viewer.style.height = `${Math.round(width / ratio)}px`;
+    };
+
+    const resizeViewers = () => {
+      setViewerHeight(instantViewer, ratioFrom(instantImg));
+      setViewerHeight(fadeViewer, ratioFrom(fadeA, fadeB));
+      setViewerHeight(wipeViewer, ratioFrom(wipeA, wipeB));
+      const stereoRatio = ratioFrom(stereoLeft, stereoRight);
+      stereoPanes.forEach((pane) => setViewerHeight(pane, stereoRatio));
+    };
+
     const updateAllImages = () => {
       photoAImgs.forEach((img) => (img.src = currentA));
       photoBImgs.forEach((img) => (img.src = currentB));
       instantImg.src = showingA ? currentA : currentB;
+      updateStereo();
+      resizeViewers();
     };
 
     const loadImage = (file, target) => {
@@ -364,13 +478,14 @@
 
     photoInputs.a.addEventListener("change", (event) => loadImage(event.target.files[0], "a"));
     photoInputs.b.addEventListener("change", (event) => loadImage(event.target.files[0], "b"));
+    stereoToggle.addEventListener("change", updateStereo);
 
     const flipButton = document.getElementById("flipButton");
-    const instantViewer = document.querySelector(".instant-display");
     const toggleInstant = () => {
       showingA = !showingA;
       instantImg.src = showingA ? currentA : currentB;
       flipButton.textContent = showingA ? "Show Photo B" : "Show Photo A";
+      resizeViewers();
     };
     flipButton.addEventListener("click", toggleInstant);
     instantViewer.addEventListener("click", toggleInstant);
@@ -378,14 +493,42 @@
     const fadeSlider = document.getElementById("fadeSlider");
     const fadeLayerImg = document.querySelector(".fade-layer .photo-b");
     const updateFade = (value) => {
-      fadeLayerImg.style.opacity = (value / 100).toFixed(2);
+      const percent = Number(value);
+      fadeLayerImg.style.opacity = (percent / 100).toFixed(2);
+      fadeSlider.value = percent;
     };
     fadeSlider.addEventListener("input", (event) => updateFade(event.target.value));
+
+    const updateFadeFromPointer = (event) => {
+      const bounds = fadeViewer.getBoundingClientRect();
+      const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+      const raw = ((clientX - bounds.left) / bounds.width) * 100;
+      const percent = Math.min(100, Math.max(0, raw));
+      updateFade(percent);
+    };
+    let fadeDragging = false;
+    const startFadeDrag = (event) => {
+      fadeDragging = true;
+      updateFadeFromPointer(event);
+    };
+    const moveFadeDrag = (event) => {
+      if (!fadeDragging) return;
+      updateFadeFromPointer(event);
+    };
+    const stopFadeDrag = () => {
+      fadeDragging = false;
+    };
+    fadeViewer.addEventListener("mousedown", startFadeDrag);
+    fadeViewer.addEventListener("touchstart", startFadeDrag, { passive: true });
+    window.addEventListener("mousemove", moveFadeDrag);
+    window.addEventListener("touchmove", moveFadeDrag, { passive: true });
+    window.addEventListener("mouseup", stopFadeDrag);
+    window.addEventListener("touchend", stopFadeDrag);
+    window.addEventListener("touchcancel", stopFadeDrag);
 
     const wipeSlider = document.getElementById("wipeSlider");
     const wipeLayer = document.getElementById("wipeLayer");
     const divider = document.getElementById("divider");
-    const wipeViewer = document.getElementById("wipeViewer");
     const updateWipe = (value) => {
       const percent = Number(value);
       const clipRight = 100 - percent;
@@ -420,6 +563,11 @@
     window.addEventListener("mouseup", stopDrag);
     window.addEventListener("touchend", stopDrag);
     window.addEventListener("touchcancel", stopDrag);
+    window.addEventListener("resize", resizeViewers);
+
+    [instantImg, fadeA, fadeB, wipeA, wipeB, stereoLeft, stereoRight].forEach((img) => {
+      img.addEventListener("load", resizeViewers);
+    });
 
     updateAllImages();
     updateFade(fadeSlider.value);
